@@ -1,70 +1,71 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net"
 
-	message_types "github.com/mikkoryynanen/real-time/internal/types"
+	messages "github.com/mikkoryynanen/real-time/generated/proto"
+	"google.golang.org/protobuf/proto"
 )
 
-var handlers = map[int]func(net.Conn, message_types.BaseMessage) {
-	0 : HandlePlayerInput,
+var handlers = map[int32]func(*messages.WrapperMessage) {
+	0: HandleClientInput,
 }
 
 func Init(conn net.Conn) {
-	messagesChannel := make(chan message_types.BaseMessage, 1024)
+	messagesChannel := make(chan messages.WrapperMessage, 1024)
+
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	go handleRequest(conn, messagesChannel)
-	go handleMessages(conn, messagesChannel)
+	go handleMessages(messagesChannel)
 }
 
-func handleRequest(conn net.Conn, cn chan message_types.BaseMessage) {
+func handleRequest(conn net.Conn, messageChannel chan messages.WrapperMessage) {
 	defer conn.Close()
 
-	decoder := json.NewDecoder(conn)	
-
 	for {
-		var msg message_types.BaseMessage
-		if err := decoder.Decode(&msg); err != nil {
-			if err == io.EOF {
-				log.Printf("Connection closed by the remote end.")
-				break
+		buffer := make([]byte, 1024)
+		n, err := conn.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				log.Print(err)
 			}
-			log.Printf("Decoding failed %v", err)
+			return
 		}
 
-		cn <- msg
+		// Resize the buffer to remove the extra values
+		buffer = buffer[:n]
+
+		msg := &messages.WrapperMessage{}
+		if err := proto.Unmarshal(buffer, msg); err != nil {
+			log.Println(err)
+		}
+		
+		// log.Printf("message received %v", msg.GetClientInputRequest())
+		
+		messageChannel <- *msg
 	}
 }
 
-func handleMessages(conn net.Conn, cn chan message_types.BaseMessage) {
+func handleMessages(messageChannel chan messages.WrapperMessage) {
 	for {
-		for msg := range cn {
-			handlers[int(msg.Type)](conn, msg)
+		for msg := range messageChannel {
+			value, exists := handlers[msg.MessageType]
+			if exists {
+				value(&msg)
+			} else {
+				log.Printf("Could not find handler for message type %v", msg.MessageType)
+			}
 		}
 	}
 }
 
-func HandlePlayerInput(conn net.Conn, msg message_types.BaseMessage) {
+func HandleClientInput(msg *messages.WrapperMessage) {
 	log.Println("Handling player input message")
 					
-	buffer := make([]byte, 1024)
-	n, err := conn.Read(buffer)
-	if err != nil {
-		log.Print(err)
-	}
+	log.Printf("Received player input %v", msg.GetClientInputRequest())
 
-	// Resize the buffer to remove the extra values
-	buffer = buffer[:n]
-
-	var data message_types.PlayerInput
-	if err := json.Unmarshal(buffer, &data); err != nil {
-		fmt.Println("Error decoding PlayerInput data:", err)
-		return
-	}
-
-	fmt.Printf("Received PlayerInput message: %v\n", data)
+	// fmt.Printf("Received PlayerInput message: %v\n", m)
 }

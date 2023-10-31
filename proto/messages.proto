@@ -1,0 +1,27 @@
+syntax = "proto3";
+option go_package = "github.com/mikkoryynanen/gRPC-server/messages";
+
+import "proto/common.proto";
+
+message ClientConnectionRequest {
+}
+
+message ClientConnectionResponse {
+	int32 clientId = 1;
+}
+
+message ClientInputRequest {
+	Vector2 input = 1;
+}
+
+message GameState {
+	int32 clientId = 1;
+	Vector2 clientPosition = 2;
+}
+
+message WrapperMessage {
+	int32 messageType = 1;
+	oneof msg {
+		ClientInputRequest clientInputRequest = 2;
+	}
+}

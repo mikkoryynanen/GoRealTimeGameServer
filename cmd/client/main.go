@@ -4,14 +4,13 @@
 package main
 
 import (
-	"math/rand"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
-	message_types "github.com/mikkoryynanen/real-time/internal/types"
+	messages "github.com/mikkoryynanen/real-time/generated/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 func main() {
@@ -35,22 +34,31 @@ func main() {
     }
     
     for {
-        msg := &message_types.PlayerInput{
-            X: int16(rand.Intn(101)),
-            Y: int16(rand.Intn(101)),
+        // TODO Create helper func?
+        msg := &messages.WrapperMessage{
+            MessageType: 0,
+            Msg: &messages.WrapperMessage_ClientInputRequest{
+                ClientInputRequest: &messages.ClientInputRequest{
+                    Input: &messages.Vector2{
+                                    X: 1,
+                                    Y: 0.1,
+                                },
+                },
+            },
         }
-
-        json, err := json.Marshal(msg)
+        bytes, err := proto.Marshal(msg)
         if err != nil {
             log.Fatal(err)
             return
         }
 
-        _, err = conn.Write(json)
+        _, err = conn.Write(bytes)
         if err != nil {
             log.Fatal(err)
             return
         }
+
+        log.Println("Sent message %v", msg)
 
         time.Sleep(1 * time.Second)
     }

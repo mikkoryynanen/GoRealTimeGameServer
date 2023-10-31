@@ -1,7 +1,10 @@
 syntax = "proto3";
-option go_package = "github.com/mikkoryynanen/gRPC-server/messages";
+option go_package = "github.com/mikkoryynanen/real-time/messages";
 
-import "proto/common.proto";
+message Vector2 {
+	float X = 1;
+	float Y = 2;
+}
 
 message ClientConnectionRequest {
 }

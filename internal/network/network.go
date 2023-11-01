@@ -2,12 +2,12 @@ package network
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
+	"io"
 	"log"
 
-	arguments "github.com/mikkoryynanen/real-time/utils"
 	handlers "github.com/mikkoryynanen/real-time/internal/handlers"
+	arguments "github.com/mikkoryynanen/real-time/utils"
 )
 
 func Start(args *arguments.Arguments) {
@@ -29,6 +29,10 @@ func Start(args *arguments.Arguments) {
 	
 	defer listener.Close()
 
+	handler := handlers.NewHandler()
+	handler.Init()
+
+	// Continously accept connections
 	for {
 		conn, err := listener.Accept()
         if err != nil {
@@ -36,18 +40,32 @@ func Start(args *arguments.Arguments) {
             break
         }
 
-        log.Printf("server: accepted from %s", conn.RemoteAddr())
-		
-        tlscon, ok := conn.(*tls.Conn)
-        if ok {
-            log.Print("Connection established")
+        log.Printf("Connection accepted from %s", conn.RemoteAddr())
+        
+        if tlsconn, ok := conn.(*tls.Conn); ok {
+			handler.AddConnection(tlsconn)
 
-            state := tlscon.ConnectionState()
-            for _, v := range state.PeerCertificates {
-                log.Print(x509.MarshalPKIXPublicKey(v.PublicKey))
-            }
-        }
+			defer tlsconn.Close()
+			
+			for {
+				buffer := make([]byte, 1024)
+				n, err := tlsconn.Read(buffer)
+				if err != nil {
+					if err != io.EOF {
+						log.Print(err)
+					}
+					return
+				}
 
-		handlers.Init(conn)
+				buffer = buffer[:n]
+
+				handler.EnqueueMessage(buffer)
+			}
+
+            // state := tlscon.ConnectionState()
+            // for _, v := range state.PeerCertificates {
+            //     log.Print(x509.MarshalPKIXPublicKey(v.PublicKey))
+            // }
+        }		
 	}
 }

@@ -6,11 +6,8 @@ message Vector2 {
 	float Y = 2;
 }
 
-message ClientConnectionRequest {
-}
-
 message ClientConnectionResponse {
-	int32 clientId = 1;
+	string sessionId = 1;
 }
 
 message ClientInputRequest {
@@ -18,13 +15,14 @@ message ClientInputRequest {
 }
 
 message GameState {
-	int32 clientId = 1;
 	Vector2 clientPosition = 2;
 }
 
 message WrapperMessage {
-	int32 messageType = 1;
+	string sessionId = 1;
+	int32 messageType = 2;
 	oneof msg {
-		ClientInputRequest clientInputRequest = 2;
+		ClientConnectionResponse clientConnectionResponse = 3;
+		ClientInputRequest clientInputRequest = 4;
 	}
 }

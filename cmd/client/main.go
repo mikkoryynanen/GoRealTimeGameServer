@@ -6,6 +6,7 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -32,34 +33,71 @@ func main() {
     for _, v  := range state.PeerCertificates {
         fmt.Println(v.Subject)
     }
-    
+
+    go receiveMessages(conn)
+    go sendMessages()
+
+    select{}
+}
+
+func receiveMessages(conn *tls.Conn) {
+    for {
+        buffer := make([]byte, 1024)
+        n, err := conn.Read(buffer)
+        if err != nil {
+            if err != io.EOF {
+                log.Print(err)
+            }
+        }
+        buffer = buffer[:n]
+
+        if len(buffer) > 0 {
+            msg := &messages.WrapperMessage{}
+			if err := proto.Unmarshal(buffer, msg); err != nil {
+				log.Println(err)
+			}
+			
+			switch msg.GetMessageType() {
+                case 0:
+                    log.Printf("received connection response %v", msg)
+                
+            }
+        }
+    }
+}
+
+func sendMessages() {
     for {
         // TODO Create helper func?
-        msg := &messages.WrapperMessage{
-            MessageType: 0,
-            Msg: &messages.WrapperMessage_ClientInputRequest{
-                ClientInputRequest: &messages.ClientInputRequest{
-                    Input: &messages.Vector2{
-                                    X: 1,
-                                    Y: 0.1,
-                                },
-                },
-            },
-        }
-        bytes, err := proto.Marshal(msg)
-        if err != nil {
-            log.Fatal(err)
-            return
-        }
-
-        _, err = conn.Write(bytes)
-        if err != nil {
-            log.Fatal(err)
-            return
-        }
-
-        log.Println("Sent message %v", msg)
+        // msg := &messages.WrapperMessage{
+        //     MessageType: 0,
+        //     Msg: &messages.WrapperMessage_ClientInputRequest{
+        //         ClientInputRequest: &messages.ClientInputRequest{
+        //             Input: &messages.Vector2{
+        //                             X: 1,
+        //                             Y: 0.1,
+        //                         },
+        //         },
+        //     },
+        // }
+        // sendMessage(conn, msg)
 
         time.Sleep(1 * time.Second)
     }
+}
+
+func sendMessage(conn *tls.Conn, msg *messages.WrapperMessage) {
+    bytes, err := proto.Marshal(msg)
+    if err != nil {
+        log.Fatal(err)
+        return
+    }
+
+    _, err = conn.Write(bytes)
+    if err != nil {
+        log.Fatal(err)
+        return
+    }
+
+    log.Printf("Sent message %v", msg)
 }

@@ -11,5 +11,5 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	
 	args := arguments.GetArguments()
-	network.Start(args)
+	log.Fatal(network.Start(args))
 }

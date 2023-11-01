@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/tls"
 	"log"
+	"slices"
 	"time"
 
 	messages "github.com/mikkoryynanen/real-time/generated/proto"
@@ -81,6 +82,18 @@ func (h *Handler) AddConnection(conn *tls.Conn) {
 	log.Println("Ack sent to client")
 }
 
+func (h *Handler) RemoveClient(conn *tls.Conn) {
+	var s session.ClientSession
+	for _, session := range h.clientSessions {
+		if session.Conn == conn {
+			s = session
+		}
+	}
+	h.clientSessions = slices.DeleteFunc(h.clientSessions, func(cs session.ClientSession) bool {
+		return cs == s	
+	})
+}
+
 
 type ClientInputHandler struct {
 	handler		*Handler
@@ -103,6 +116,8 @@ func (h *ClientInputHandler) Handle(msg *messages.WrapperMessage) {
 func (h *Handler) handleInbound() {
 	for {
 		for buffer := range h.inboundMessagesChannel {
+			log.Printf("Inbound message %v", buffer)
+
 			msg := &messages.WrapperMessage{}
 			if err := proto.Unmarshal(buffer, msg); err != nil {
 				log.Println(err)
@@ -121,7 +136,7 @@ func (h *Handler) handleInbound() {
 		}
 
 		// TODO Not sure if we need this, seems to be working quite ok without it
-		// time.Sleep(time.Millisecond)
+		time.Sleep(time.Millisecond)
 	}
 }
 

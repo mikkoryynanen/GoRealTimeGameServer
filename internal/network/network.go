@@ -10,19 +10,17 @@ import (
 	arguments "github.com/mikkoryynanen/real-time/utils"
 )
 
-func Start(args *arguments.Arguments) {
+func Start(args *arguments.Arguments) error {
 	cert, err := tls.LoadX509KeyPair(args.CertPath, args.KeyPath)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 	
 	config := tls.Config{ Certificates: []tls.Certificate{cert}}
 	
 	listener, err := tls.Listen("tcp", fmt.Sprintf("%v:%v", args.Host, args.Port), &config)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return err
 	}
 	
 	fmt.Printf("Listening on port %v", args.Port)
@@ -47,20 +45,7 @@ func Start(args *arguments.Arguments) {
 
 			defer tlsconn.Close()
 			
-			for {
-				buffer := make([]byte, 1024)
-				n, err := tlsconn.Read(buffer)
-				if err != nil {
-					if err != io.EOF {
-						log.Print(err)
-					}
-					return
-				}
-
-				buffer = buffer[:n]
-
-				handler.EnqueueMessage(buffer)
-			}
+			go readStream(tlsconn, handler)
 
             // state := tlscon.ConnectionState()
             // for _, v := range state.PeerCertificates {
@@ -68,4 +53,25 @@ func Start(args *arguments.Arguments) {
             // }
         }		
 	}
+
+	return nil
+}
+
+func readStream(conn *tls.Conn, handler *handlers.Handler) {
+	for {
+		buffer := make([]byte, 1024)
+		n, err := conn.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				log.Print(err)
+			}
+			handler.RemoveClient(conn)
+		}
+
+		buffer = buffer[:n]
+
+		if len(buffer) > 0 {
+			handler.EnqueueMessage(buffer)
+			}
+		}
 }
